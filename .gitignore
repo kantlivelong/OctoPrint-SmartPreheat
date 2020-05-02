@@ -1,0 +1,6 @@
+OctoPrint_*.egg-info
+.idea
+*.orig
+*.swp
+*.pyc
+
