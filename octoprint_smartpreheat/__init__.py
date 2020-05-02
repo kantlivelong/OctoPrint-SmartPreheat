@@ -57,7 +57,7 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
             self._settings.saveScript("gcode", "snippets/doSmartPreheat", u'' + script.replace("\r\n", "\n").replace("\r", "\n"))
 
     def get_settings_defaults(self):
-        return dict()
+        return dict(dummy=False)
 
     def get_template_configs(self):
         return [
