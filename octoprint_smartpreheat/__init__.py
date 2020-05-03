@@ -73,7 +73,7 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
         path_on_disk = octoprint.server.fileManager.path_on_disk(octoprint.filemanager.FileDestinations.LOCAL, selected_file)
 
         temps = dict(tools=dict(), bed=None)
-        toolNum = 0
+        currentToolNum = 0
         lineNum = 0
         self._logger.debug("Parsing g-code file, Path=%s", path_on_disk)
         with open(path_on_disk, "r") as file:
@@ -86,13 +86,20 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
                     self._logger.debug("Line %d: Detected first extrusion. Read complete.", lineNum)
                     break
 
-                toolMatch = octoprint.util.comm.regexes_parameters["intT"].search(line)
-                if toolMatch:
-                    self._logger.debug("Line %d: Detected SetTool. Line=%s", lineNum, line)
-                    toolNum = int(toolMatch.group("value"))
+                if gcode and gcode.startswith("T"):
+                    toolMatch = octoprint.util.comm.regexes_parameters["intT"].search(line)
+                    if toolMatch:
+                        self._logger.debug("Line %d: Detected SetTool. Line=%s", lineNum, line)
+                        currentToolNum = int(toolMatch.group("value"))
 
                 if gcode in ('M104', 'M109', 'M140', 'M190'):
                     self._logger.debug("Line %d: Detected SetTemp. Line=%s", lineNum, line)
+
+                    toolMatch = octoprint.util.comm.regexes_parameters["intT"].search(line)
+                    if toolMatch:
+                        toolNum = int(toolMatch.group("value"))
+                    else:
+                        toolNum = currentToolNum
 
                     tempMatch = octoprint.util.comm.regexes_parameters["floatS"].search(line)
                     if tempMatch:
