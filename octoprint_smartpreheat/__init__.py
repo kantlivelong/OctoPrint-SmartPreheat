@@ -105,6 +105,7 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
                             self._logger.debug("Line %d: Bed = %s", lineNum, temp)
                             temps["bed"] = temp
 
+        self._logger.debug("Temperatures: %r", temps)
         return temps
 
     def on_event(self, event, payload):
