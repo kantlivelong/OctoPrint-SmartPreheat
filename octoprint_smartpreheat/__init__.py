@@ -74,21 +74,24 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
 
         temps = dict(tools=dict(), bed=None)
         toolNum = 0
+        lineNum = 0
+        self._logger.debug("Parsing g-code file, Path=%s", path_on_disk)
         with open(path_on_disk, "r") as file:
             for line in file:
+                lineNum += 1
 
                 if re.match(r'G1[A-Z\s]*E.*', line):
-                    self._logger.debug("Detected first extrusion. Read complete.")
+                    self._logger.debug("Line %d: Detected first extrusion. Read complete.", lineNum)
                     break
 
                 toolMatch = octoprint.util.comm.regexes_parameters["intT"].search(line)
                 if toolMatch:
-                    self._logger.debug("Detected SetTool. Line=%s" % line)
+                    self._logger.debug("Line %d: Detected SetTool. Line=%s", lineNum, line)
                     toolNum = int(toolMatch.group("value"))
 
                 match = re.match(r'M(104|109|140|190).*S.*', line)
                 if match:
-                    self._logger.debug("Detected SetTemp. Line=%s" % line)
+                    self._logger.debug("Line %d: Detected SetTemp. Line=%s", lineNum, line)
 
                     code = match.group(1)
 
@@ -97,10 +100,10 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
                         temp = int(tempMatch.group("value"))
 
                         if code in ["104", "109"]:
-                            self._logger.debug("Tool %s = %s" % (toolNum, temp))
+                            self._logger.debug("Line %d: Tool %s = %s", lineNum, toolNum, temp)
                             temps["tools"][toolNum] = temp
                         elif code in ["140", "190"]:
-                            self._logger.debug("Bed = %s" % temp)
+                            self._logger.debug("Line %d: Bed = %s", lineNum, temp)
                             temps["bed"] = temp
 
         return temps
