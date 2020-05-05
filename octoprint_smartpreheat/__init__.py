@@ -20,26 +20,36 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
     def __init__(self):
         self.default_smartpreheat_script = textwrap.dedent(
         """
-        ; Wait for bed to reach 80% of required temp then set to required temp
-        {% if printer_profile.heatedBed %}
-        M190 S{{ (plugins.smartpreheat.bed * 0.8)|round }}
-        M140 S{{ plugins.smartpreheat.bed }}
+        {# Init vars #}
+        {%- set bed = plugins.smartpreheat.bed|default(75 , true) -%}
+        {%- set list = plugins.smartpreheat.tools|default({-1: 195}, true) -%}
+
+        {%- if printer_profile.heatedBed -%} 
+        ; Set bed
+        M117 Set bed: {{ bed|int }}
+        M190 S{{- (bed|int * 0.8)|round|int -}} ; Wait for Bed
+        M140 S{{- bed|int -}} ; Set Bed
         {% endif %}
 
         ; Set tool temps
-        {% for tool, temp in plugins.smartpreheat.tools.items() %}
-        M104 T{{ tool }} S{{ temp }}
-        {% endfor %}
+        {%- for tool, temp in list.items() %}
+        M117 Set {{ 'default tool' if tool|int < 0 else 'tool ' + tool|int|string }} to temp {{ temp|int }} 
+        M104 {{- '' if tool|int < 0 else ' T' + tool|int|string }} S{{- temp|int -}} ; Set Hotend
+        {%- endfor %}
 
-        ; Wait for bed
-        {% if printer_profile.heatedBed %}
-        M190 S{{ plugins.smartpreheat.bed }}
+        {%- if printer_profile.heatedBed -%} 
+        ; Wait bed
+        M190 S{{- bed -}} ; Wait for Bed
         {% endif %}
 
-        ; Wait for tools
-        {% for tool, temp in plugins.smartpreheat.tools.items() %}
-        M109 T{{ tool }} S{{ temp }}
-        {% endfor %}
+        ; Wait tool temps
+        {%- for tool, temp in list.items() %}
+        M109 {{- '' if tool|int < 0 else ' T' + tool|int|string }} S{{- temp|int -}} ; Wait for Hotend
+        {%- endfor %}
+
+        G28 X Y
+        M400; wait
+        M117 PreHeat DONE
         """)
 
         self.temp_data = None
@@ -73,40 +83,40 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
         path_on_disk = octoprint.server.fileManager.path_on_disk(octoprint.filemanager.FileDestinations.LOCAL, selected_file)
 
         temps = dict(tools=dict(), bed=None)
-        toolNum = 0
-        with open(path_on_disk, "r") as file:
-            for line in file:
+        toolNum = None
+        lineNum = 0
 
-                if re.match(r'G1[A-Z\s]*E.*', line):
-                    self._logger.debug("Detected first extrusion. Read complete.")
-                    break
-
-                toolMatch = octoprint.util.comm.regexes_parameters["intT"].search(line)
-                if toolMatch:
-                    self._logger.debug("Detected SetTool. Line=%s" % line)
-                    toolNum = int(toolMatch.group("value"))
-
-                match = re.match(r'M(104|109|140|190).*S.*', line)
+        for line in open(path_on_disk, "r"):
+            lineNum += 1
+            if not toolNum: 
+                match = re.match(r'^\s*?T(\d+)', line)
                 if match:
-                    self._logger.debug("Detected SetTemp. Line=%s" % line)
-
-                    code = match.group(1)
-
-                    tempMatch = octoprint.util.comm.regexes_parameters["floatS"].search(line)
-                    if tempMatch:
-                        temp = int(tempMatch.group("value"))
-
-                        if code in ["104", "109"]:
-                            self._logger.debug("Tool %s = %s" % (toolNum, temp))
-                            temps["tools"][toolNum] = temp
-                        elif code in ["140", "190"]:
-                            self._logger.debug("Bed = %s" % temp)
-                            temps["bed"] = temp
-
+                    toolNum = match.group(1)
+            match = re.match(r'^\s*?M(109|190)+\s', line) # r'M(104|109|140|190).*S.*'
+            if match:
+                code = match.group(1)
+                line = line.split(';')[0].strip()
+                temp = re.match(r'.*?S(\d+)', line)
+                if temp:
+                    #self._logger.debug("Line %s - Detected SetTemp: %s = %s" % (lineNum, line,  code))
+                    if code == '109' and not len(temps["tools"]): # in ["104", "109"]
+                        match = re.match(r'.*?T(\d+)', line)
+                        if match: toolNum = match.group(1)
+                        if not toolNum: toolNum = -1
+                        temps["tools"][toolNum] = temp.group(1)
+                        self._logger.debug("Line %s - set tool %s: %s" % (lineNum, toolNum, temps["tools"][toolNum]))
+                        if temps["bed"]: break
+                    elif code == '190' and not temps["bed"]: # in ["140", "190"]
+                        temps["bed"] = temp.group(1)
+                        self._logger.debug("Line %s - set bed: %s" % (lineNum, temps["bed"]))
+                        if len(temps["tools"]): break
+            elif re.match(r'^\s*?G(0|1)+.*?E\d*?[^;]', line): # https://regex101.com/
+                self._logger.debug("Line %s: Read complete" % lineNum)
+                break
         return temps
 
     def on_event(self, event, payload):
-        if event == Events.FILE_SELECTED:
+        if event in [Events.FILE_SELECTED, Events.PRINT_STARTED] :
             self._scan_event.clear()
 
             self.temp_data = None
