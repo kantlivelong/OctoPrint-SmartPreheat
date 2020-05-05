@@ -73,36 +73,46 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
         path_on_disk = octoprint.server.fileManager.path_on_disk(octoprint.filemanager.FileDestinations.LOCAL, selected_file)
 
         temps = dict(tools=dict(), bed=None)
-        toolNum = 0
+        currentToolNum = 0
+        lineNum = 0
+        self._logger.debug("Parsing g-code file, Path=%s", path_on_disk)
         with open(path_on_disk, "r") as file:
             for line in file:
+                lineNum += 1
 
-                if re.match(r'G1[A-Z\s]*E.*', line):
-                    self._logger.debug("Detected first extrusion. Read complete.")
+                gcode = octoprint.util.comm.gcode_command_for_cmd(line)
+                extrusionMatch = octoprint.util.comm.regexes_parameters["floatE"].search(line)
+                if gcode == "G1" and extrusionMatch:
+                    self._logger.debug("Line %d: Detected first extrusion. Read complete.", lineNum)
                     break
 
-                toolMatch = octoprint.util.comm.regexes_parameters["intT"].search(line)
-                if toolMatch:
-                    self._logger.debug("Detected SetTool. Line=%s" % line)
-                    toolNum = int(toolMatch.group("value"))
+                if gcode and gcode.startswith("T"):
+                    toolMatch = octoprint.util.comm.regexes_parameters["intT"].search(line)
+                    if toolMatch:
+                        self._logger.debug("Line %d: Detected SetTool. Line=%s", lineNum, line)
+                        currentToolNum = int(toolMatch.group("value"))
 
-                match = re.match(r'M(104|109|140|190).*S.*', line)
-                if match:
-                    self._logger.debug("Detected SetTemp. Line=%s" % line)
+                if gcode in ('M104', 'M109', 'M140', 'M190'):
+                    self._logger.debug("Line %d: Detected SetTemp. Line=%s", lineNum, line)
 
-                    code = match.group(1)
+                    toolMatch = octoprint.util.comm.regexes_parameters["intT"].search(line)
+                    if toolMatch:
+                        toolNum = int(toolMatch.group("value"))
+                    else:
+                        toolNum = currentToolNum
 
                     tempMatch = octoprint.util.comm.regexes_parameters["floatS"].search(line)
                     if tempMatch:
                         temp = int(tempMatch.group("value"))
 
-                        if code in ["104", "109"]:
-                            self._logger.debug("Tool %s = %s" % (toolNum, temp))
+                        if gcode in ("M104", "M109"):
+                            self._logger.debug("Line %d: Tool %s = %s", lineNum, toolNum, temp)
                             temps["tools"][toolNum] = temp
-                        elif code in ["140", "190"]:
-                            self._logger.debug("Bed = %s" % temp)
+                        elif gcode in ("M140", "M190"):
+                            self._logger.debug("Line %d: Bed = %s", lineNum, temp)
                             temps["bed"] = temp
 
+        self._logger.debug("Temperatures: %r", temps)
         return temps
 
     def on_event(self, event, payload):
