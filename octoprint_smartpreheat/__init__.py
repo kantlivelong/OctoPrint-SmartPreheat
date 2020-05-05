@@ -88,6 +88,10 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
 
         for line in open(path_on_disk, "r"):
             lineNum += 1
+            if not toolNum: 
+                match = re.match(r'^\s*?T(\d+)', line)
+                if match:
+                    toolNum = match.group(1)
             match = re.match(r'^\s*?M(109|190)+\s', line) # r'M(104|109|140|190).*S.*'
             if match:
                 code = match.group(1)
@@ -96,11 +100,9 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
                 if temp:
                     #self._logger.debug("Line %s - Detected SetTemp: %s = %s" % (lineNum, line,  code))
                     if code == '109' and not len(temps["tools"]): # in ["104", "109"]
-                        toolNum = re.match(r'.*?T(\d+)', line)
-                        if toolNum:
-                            toolNum = toolNum.group(1)
-                        else:
-                            toolNum = -1
+                        match = re.match(r'.*?T(\d+)', line)
+                        if match: toolNum = match.group(1)
+                        if not toolNum: toolNum = -1
                         temps["tools"][toolNum] = temp.group(1)
                         self._logger.debug("Line %s - set tool %s: %s" % (lineNum, toolNum, temps["tools"][toolNum]))
                         if temps["bed"]: break
