@@ -21,33 +21,34 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
         self.default_smartpreheat_script = textwrap.dedent(
         """
         {# Init vars #}
-        {%- if plugins.smartpreheat is defined %}
-         {%- set bed, list = plugins.smartpreheat.bed|default(75 , true), plugins.smartpreheat.tools|default({-1: 195} , true) %}
-        {%- endif -%}
+        {%- set bed = plugins.smartpreheat.bed|default(75 , true) -%}
+        {%- set list = plugins.smartpreheat.tools|default({-1: 195}, true) -%}
 
+        {%- if printer_profile.heatedBed -%} 
         ; Set bed
-        {%- if printer_profile.heatedBed %}
-        M117 Set bed: {{ bed }}
-        M190 S{{- (bed * 0.8)|round|int -}} ; Wait for Bed
-        M140 S{{- bed -}} ; Set Bed
-        {%- endif %}
+        M117 Set bed: {{ bed|int }}
+        M190 S{{- (bed|int * 0.8)|round|int -}} ; Wait for Bed
+        M140 S{{- bed|int -}} ; Set Bed
+        {% endif %}
 
         ; Set tool temps
         {%- for tool, temp in list.items() %}
-        M117 Set tool{{- '' if tool < 0 else tool }}: {{- temp }}
-        M104 {{- '' if tool < 0 else ' T' + tool|string }} S{{- temp -}} ; Set Hotend
+        M117 Set tool{{- '' if tool|int < 0 else tool|int }}: {{- temp|int }}
+        M104 {{- '' if tool|int < 0 else ' T' + tool|int|string }} S{{- temp|int -}} ; Set Hotend
         {%- endfor %}
 
+        {%- if printer_profile.heatedBed -%} 
         ; Wait bed
-        {%- if printer_profile.heatedBed %}
         M190 S{{- bed -}} ; Wait for Bed
-        {%- endif %}
+        {% endif %}
 
         ; Wait tool temps
         {%- for tool, temp in list.items() %}
-        M109 {{- '' if tool < 0 else ' T' + tool|string }} S{{- temp -}} ; Wait for Hotend
+        M109 {{- '' if tool|int < 0 else ' T' + tool|int|string }} S{{- temp|int -}} ; Wait for Hotend
         {%- endfor %}
 
+        M400; wait
+        M117 PreHeat DONE
         M400; wait
         M117 PreHeat DONE
         """)
