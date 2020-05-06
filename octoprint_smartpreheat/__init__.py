@@ -92,6 +92,8 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
                 if lineNum < 1000:
                     lineNum += 1
                 else:
+                    # if not temps["bed"]: temps["tools"] = 75
+                    # if not len(temps["tools"]): temps["tools"] = {-1: 195}
                     break
                 if not toolNum:
                     match = re.match(r'^\s*?T(\d+)', line) # https://regex101.com/
