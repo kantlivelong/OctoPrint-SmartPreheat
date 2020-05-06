@@ -89,6 +89,7 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
         # https://regex101.com/
         regex_tool = re.compile(r'^\s*?T(?P<tool>\d+)')
         regex_temp = re.compile(r'^\s*?M(?P<code>109|190)+(?:\s+(?:S(?P<temp>\d+))|(?:\s+T(?P<tool>\d+)))+')
+        regex_extr = re.compile(r'^\s*?G(?:0|1)+.*?E\d+')
 
         self._logger.debug("gcode alalysis started: %s", selected_file)
         with open(path_on_disk, "r") as file_:
@@ -105,23 +106,22 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
                         toolNum = match.group('tool')
                         self._logger.debug("Line %d: found tool number = %s", lineNum, toolNum)
                         continue
-                match = regex_temp.search(line) # r'M(104|109|140|190).*S.*'
+                match = regex_temp.search(line)
                 if match:
-                    # self._logger.debug("Line %d: assigned tool %s", lineNum, match.groupdict())
                     temp = match.group('temp')
                     if temp:
-                        if match.group('code') == '109' and not len(temps["tools"]): # in ["104", "109"]
+                        # self._logger.debug("Line %d: assigned tool %s", lineNum, match.groupdict())
+                        if match.group('code') == '109' and not len(temps["tools"]):
                             if match.group('tool'): toolNum = match.group('tool')
                             if not toolNum: toolNum = -1
                             temps["tools"][toolNum] = temp
                             self._logger.debug("Line %d: assigned tool %s temp %s", lineNum, toolNum, temps["tools"][toolNum])
                             if temps["bed"]: break
-                        elif match.group('code') == '190' and not temps["bed"]: # in ["140", "190"]
+                        elif match.group('code') == '190' and not temps["bed"]:
                             temps["bed"] = temp
                             self._logger.debug("Line %d: assigned bed temp = %s", lineNum, temps["bed"])
                             if len(temps["tools"]): break
-                elif re.match(r'^\s*?G(0|1)+.*?E\d*?[^;]', line):
-                    break
+                elif regex_extr.search(line): break
             self._logger.debug("Line %d: Read complete" % lineNum)
         return temps
 
