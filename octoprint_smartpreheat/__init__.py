@@ -86,6 +86,10 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
         toolNum = None
         lineNum = 0
 
+        # https://regex101.com/
+        regex_tool = re.compile(r'^\s*?T(?P<tool>\d+)')
+        regex_temp = re.compile(r'^\s*?M(?P<code>109|190)+(?:\s+(?:S(?P<temp>\d+))|(?:\s+T(?P<tool>\d+)))+')
+
         self._logger.debug("gcode alalysis started: %s", selected_file)
         with open(path_on_disk, "r") as file_:
             for line in file_:
@@ -96,26 +100,24 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
                     # if not len(temps["tools"]): temps["tools"] = {-1: 195}
                     break
                 if not toolNum:
-                    match = re.match(r'^\s*?T(\d+)', line) # https://regex101.com/
+                    match = regex_tool.search(line)
                     if match:
-                        toolNum = match.group(1)
+                        toolNum = match.group('tool')
                         self._logger.debug("Line %d: found tool number = %s", lineNum, toolNum)
                         continue
-                match = re.match(r'^\s*?M(109|190)+\s', line) # r'M(104|109|140|190).*S.*'
+                match = regex_temp.search(line) # r'M(104|109|140|190).*S.*'
                 if match:
-                    code = match.group(1)
-                    line = line.split(';')[0].strip()
-                    temp = re.match(r'.*?S(\d+)', line)
+                    # self._logger.debug("Line %d: assigned tool %s", lineNum, match.groupdict())
+                    temp = match.group('temp')
                     if temp:
-                        if code == '109' and not len(temps["tools"]): # in ["104", "109"]
-                            match = re.match(r'.*?T(\d+)', line)
-                            if match: toolNum = match.group(1)
+                        if match.group('code') == '109' and not len(temps["tools"]): # in ["104", "109"]
+                            if match.group('tool'): toolNum = match.group('tool')
                             if not toolNum: toolNum = -1
-                            temps["tools"][toolNum] = temp.group(1)
+                            temps["tools"][toolNum] = temp
                             self._logger.debug("Line %d: assigned tool %s temp %s", lineNum, toolNum, temps["tools"][toolNum])
                             if temps["bed"]: break
-                        elif code == '190' and not temps["bed"]: # in ["140", "190"]
-                            temps["bed"] = temp.group(1)
+                        elif match.group('code') == '190' and not temps["bed"]: # in ["140", "190"]
+                            temps["bed"] = temp
                             self._logger.debug("Line %d: assigned bed temp = %s", lineNum, temps["bed"])
                             if len(temps["tools"]): break
                 elif re.match(r'^\s*?G(0|1)+.*?E\d*?[^;]', line):
