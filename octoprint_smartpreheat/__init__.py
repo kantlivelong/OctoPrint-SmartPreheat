@@ -7,13 +7,9 @@ __copyright__ = "Copyright (C) 2020 Shawn Bruce - Released under terms of the AG
 
 import octoprint.plugins
 from octoprint.util.version import is_octoprint_compatible
-from octoprint.events import Events
-import threading
 import textwrap
-import re
 
 class SmartPreheat(octoprint.plugin.TemplatePlugin,
-                   octoprint.plugin.EventHandlerPlugin,
                    octoprint.plugin.AssetPlugin,
                    octoprint.plugin.SettingsPlugin):
 
@@ -43,8 +39,6 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
         """)
 
         self.temp_data = None
-        self._scan_event = threading.Event()
-        self._scan_event.set()
 
     def initialize(self):
         if is_octoprint_compatible("<=1.3.6"):
@@ -115,21 +109,15 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
         self._logger.debug("Temperatures: %r", temps)
         return temps
 
-    def on_event(self, event, payload):
-        if event == Events.FILE_SELECTED:
-            self._scan_event.clear()
-
-            self.temp_data = None
-            if payload['origin'] == 'local':
-                self.temp_data = self.get_temps_from_file(payload['path'])
-
-            self._scan_event.set()
-
     def populate_script_variables(self, comm_instance, script_type, script_name, *args, **kwargs):
         if not script_type == "gcode":
             return None
 
-        self._scan_event.wait()
+        if script_name == 'beforePrintStarted':
+            current_data = self._printer.get_current_data()
+
+            if current_data['job']['file']['origin'] == octoprint.filemanager.FileDestinations.LOCAL:
+                self.temp_data = self.get_temps_from_file(current_data['job']['file']['path'])
 
         return (None, None, self.temp_data)
 
