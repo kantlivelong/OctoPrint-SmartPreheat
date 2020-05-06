@@ -86,15 +86,18 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
         toolNum = None
         lineNum = 0
 
-        self._logger.debug("gcode alalysis started: %s" % selected_file)
+        self._logger.debug("gcode alalysis started: %s", selected_file)
         with open(path_on_disk, "r") as file_:
             for line in file_:
-                lineNum += 1
+                if lineNum < 1000:
+                    lineNum += 1
+                else:
+                    break
                 if not toolNum:
                     match = re.match(r'^\s*?T(\d+)', line) # https://regex101.com/
                     if match:
                         toolNum = match.group(1)
-                        self._logger.debug("Line %s: found tool number = %s" % (lineNum, toolNum))
+                        self._logger.debug("Line %d: found tool number = %s", lineNum, toolNum)
                         continue
                 match = re.match(r'^\s*?M(109|190)+\s', line) # r'M(104|109|140|190).*S.*'
                 if match:
@@ -107,19 +110,19 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
                             if match: toolNum = match.group(1)
                             if not toolNum: toolNum = -1
                             temps["tools"][toolNum] = temp.group(1)
-                            self._logger.debug("Line %s: found tool %s temp %s" % (lineNum, toolNum, temps["tools"][toolNum]))
+                            self._logger.debug("Line %d: assigned tool %s temp %s", lineNum, toolNum, temps["tools"][toolNum])
                             if temps["bed"]: break
                         elif code == '190' and not temps["bed"]: # in ["140", "190"]
                             temps["bed"] = temp.group(1)
-                            self._logger.debug("Line %s: found bed temp = %s" % (lineNum, temps["bed"]))
+                            self._logger.debug("Line %d: assigned bed temp = %s", lineNum, temps["bed"])
                             if len(temps["tools"]): break
                 elif re.match(r'^\s*?G(0|1)+.*?E\d*?[^;]', line):
                     break
-            self._logger.debug("Line %s: Read complete" % lineNum)
+            self._logger.debug("Line %d: Read complete" % lineNum)
         return temps
 
     def on_event(self, event, payload):
-        if event in [Events.FILE_SELECTED, Events.PRINT_STARTED] :
+        if event is Events.PRINT_STARTED: # in [Events.FILE_SELECTED, Events.PRINT_STARTED]
             self._scan_event.clear()
 
             self.temp_data = None
