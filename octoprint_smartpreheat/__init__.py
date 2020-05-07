@@ -87,9 +87,9 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
         lineNum = 0
 
         # https://regex101.com/
-        regex_tool = re.compile(r'^\s*?T(?P<tool>\d+)')
-        regex_temp = re.compile(r'^\s*?M(?P<code>109|190)+(?:\s+(?:S(?P<temp>\d+))|(?:\s+T(?P<tool>\d+)))+')
         regex_extr = re.compile(r'^\s*?G(?:0|1)+.*?E\d+')
+        regex_temp = re.compile(r'^\s*?M(?P<code>109|190)+(?:\s+(?:S(?P<temp>\d+))|(?:\s+T(?P<tool>\d+)))+')
+        regex_tool = re.compile(r'^\s*?T(?P<tool>\d+)')
 
         self._logger.debug("gcode alalysis started: %s", selected_file)
         with open(path_on_disk, "r") as file_:
@@ -126,7 +126,7 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
         return temps
 
     def on_event(self, event, payload):
-        if event is Events.PRINT_STARTED: # in [Events.FILE_SELECTED, Events.PRINT_STARTED]
+        if event == Events.FILE_SELECTED:
             self._scan_event.clear()
 
             self.temp_data = None
