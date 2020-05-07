@@ -26,15 +26,15 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
 
         {%- if printer_profile.heatedBed -%}
         ; Set bed
-        M117 Set bed: {{ bed|int }}
-        M190 S{{- (bed|int * 0.8)|round|int -}} ; Wait for Bed
-        M140 S{{- bed|int -}} ; Set Bed
+        M117 Set bed: {{ bed }}
+        M190 S{{- (bed * 0.8)|round -}} ; Wait for Bed
+        M140 S{{- bed -}} ; Set Bed
         {% endif %}
 
         ; Set tool temps
         {%- for tool, temp in list.items() %}
-        M117 Set {{ 'default tool' if tool|int < 0 else 'tool ' + tool|int|string }} to temp {{ temp|int }}
-        M104 {{- '' if tool|int < 0 else ' T' + tool|int|string }} S{{- temp|int -}} ; Set Hotend
+        M117 Set {{ 'default tool' if tool < 0 else 'tool ' + tool|string }} to temp {{ temp }}
+        M104 {{- '' if tool < 0 else ' T' + tool|string }} S{{- temp -}} ; Set Hotend
         {%- endfor %}
 
         {%- if printer_profile.heatedBed -%}
@@ -44,7 +44,7 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
 
         ; Wait tool temps
         {%- for tool, temp in list.items() %}
-        M109 {{- '' if tool|int < 0 else ' T' + tool|int|string }} S{{- temp|int -}} ; Wait for Hotend
+        M109 {{- '' if tool < 0 else ' T' + tool|string }} S{{- temp -}} ; Wait for Hotend
         {%- endfor %}
 
         G28 X Y
@@ -82,6 +82,9 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
     def get_temps_from_file(self, selected_file):
         path_on_disk = octoprint.server.fileManager.path_on_disk(octoprint.filemanager.FileDestinations.LOCAL, selected_file)
 
+        default_bed = 55
+        default_tool = 195
+
         temps = dict(tools=dict(), bed=None)
         toolNum = None
         lineNum = 0
@@ -91,38 +94,49 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
         regex_temp = re.compile(r'^\s*?M(?P<code>109|190)+(?:\s+(?:S(?P<temp>\d+))|(?:\s+T(?P<tool>\d+)))+')
         regex_tool = re.compile(r'^\s*?T(?P<tool>\d+)')
 
-        self._logger.debug("gcode alalysis started: %s", selected_file)
+        self._logger.debug("Scanning:\t%s", selected_file)
         with open(path_on_disk, "r") as file_:
             for line in file_:
                 if lineNum < 1000:
                     lineNum += 1
                 else:
-                    # if not temps["bed"]: temps["tools"] = 75
-                    # if not len(temps["tools"]): temps["tools"] = {-1: 195}
                     break
-                if not toolNum:
+                if toolNum is None:
                     match = regex_tool.search(line)
                     if match:
-                        toolNum = match.group('tool')
-                        self._logger.debug("Line %d: found tool number = %s", lineNum, toolNum)
+                        toolNum = int(match.group('tool').replace('\D',''))
+                        self._logger.debug("Line %d:\tfound tool number = %s", lineNum, toolNum)
                         continue
                 match = regex_temp.search(line)
                 if match:
-                    temp = match.group('temp')
+                    temp = int(match.group('temp').replace('\D',''))
                     if temp:
                         # self._logger.debug("Line %d: assigned tool %s", lineNum, match.groupdict())
                         if match.group('code') == '109' and not len(temps["tools"]):
-                            if match.group('tool'): toolNum = match.group('tool')
-                            if not toolNum: toolNum = -1
+                            if match.group('tool'): toolNum = int(match.group('tool').replace('\D',''))
+                            if toolNum is None: toolNum = -1
                             temps["tools"][toolNum] = temp
-                            self._logger.debug("Line %d: assigned tool %s temp %s", lineNum, toolNum, temps["tools"][toolNum])
+                            self._logger.debug("Line %d:\tassigned tool %s temp = %s", lineNum, toolNum, temps["tools"][toolNum])
                             if temps["bed"]: break
                         elif match.group('code') == '190' and not temps["bed"]:
                             temps["bed"] = temp
-                            self._logger.debug("Line %d: assigned bed temp = %s", lineNum, temps["bed"])
+                            self._logger.debug("Line %d:\tassigned bed temp = %s", lineNum, temps["bed"])
                             if len(temps["tools"]): break
                 elif regex_extr.search(line): break
-            self._logger.debug("Line %d: Read complete" % lineNum)
+
+            if not temps["bed"]:
+                temps["bed"] = default_bed
+                self._logger.debug("Default:\tassigned bed temp = %s", lineNum, default_bed)
+
+            if not len(temps["tools"]):
+                temps["tools"] = {-1: default_tool}
+                self._logger.debug("Default:\tassigned tool %s temp %s", lineNum, -1, default_tool)
+            elif not temps["tools"][temps["tools"].keys()[0]]:
+                temps["tools"][temps["tools"].keys()[0]] =  default_tool
+                self._logger.debug("Default:\tassigned tool %s temp %s", lineNum, temps["tools"].keys()[0], default_tool)
+
+            self._logger.debug("Line %d:\tRead %s", lineNum, 'complete' if lineNum < 1000 else 'abort')
+
         return temps
 
     def on_event(self, event, payload):
