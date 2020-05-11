@@ -13,6 +13,11 @@ This OctoPrint plugin reads the currently selected GCode file to determine what 
 
 ![SmartPreHeat-GCode-Scripts-beforePrintStarted](extra/screenshots/beforePrintStarted.png?raw=true)
 
+```
+; PreHeat
+{% snippet 'doSmartPreheat' %}
+```
+
 This started out as a fork of [marian42/OctoPrint-Preheat](https://github.com/marian42/octoprint-preheat) but I ended up completely rewriting and changing things.
 
 ## Setup
