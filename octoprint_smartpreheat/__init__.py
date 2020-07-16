@@ -122,7 +122,7 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
         return (None, None, self.temp_data)
 
     def on_settings_save(self, data):
-        if data.has_key("scripts_gcode_snippets_doSmartPreheat"):
+        if 'scripts_gcode_snippets_doSmartPreheat' in data:
             script = data["scripts_gcode_snippets_doSmartPreheat"]
             self._settings.saveScript("gcode", "snippets/doSmartPreheat", u'' + script.replace("\r\n", "\n").replace("\r", "\n"))
 
