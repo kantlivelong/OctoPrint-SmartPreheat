@@ -97,7 +97,7 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
 
                     tempMatch = octoprint.util.comm.regexes_parameters["floatS"].search(line)
                     if tempMatch:
-                        temp = int(tempMatch.group("value"))
+                        temp = float(tempMatch.group("value"))
 
                         if gcode in ("M104", "M109"):
                             self._logger.debug("Line %d: Tool %s = %s", lineNum, toolNum, temp)
