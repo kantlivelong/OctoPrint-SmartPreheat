@@ -20,9 +20,11 @@ $(function() {
         };
 
         self.onSettingsBeforeSave = function () {
-            if (self.scripts_gcode_snippets_doSmartPreheat() != self.settings.scripts.gcode["snippets/doSmartPreheat"]()) {
-                self.settings.plugins.smartpreheat.scripts_gcode_snippets_doSmartPreheat = self.scripts_gcode_snippets_doSmartPreheat;
-                self.settings.scripts.gcode["snippets/doSmartPreheat"](self.scripts_gcode_snippets_doSmartPreheat());
+            if (self.scripts_gcode_snippets_doSmartPreheat() !== undefined) {
+                if (self.scripts_gcode_snippets_doSmartPreheat() != self.settings.scripts.gcode["snippets/doSmartPreheat"]()) {
+                    self.settings.plugins.smartpreheat.scripts_gcode_snippets_doSmartPreheat = self.scripts_gcode_snippets_doSmartPreheat;
+                    self.settings.scripts.gcode["snippets/doSmartPreheat"](self.scripts_gcode_snippets_doSmartPreheat());
+                }
             }
         };
     }
