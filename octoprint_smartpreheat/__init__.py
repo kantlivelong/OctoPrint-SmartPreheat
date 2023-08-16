@@ -17,7 +17,7 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
         self.default_smartpreheat_script = textwrap.dedent(
         """
         ; Wait for bed to reach 80% of required temp then set to required temp
-        {% if printer_profile.heatedBed %}
+        {% if printer_profile.heatedBed and plugins.smartpreheat.bed != None %}
         M190 S{{ (plugins.smartpreheat.bed * 0.8)|round }}
         M140 S{{ plugins.smartpreheat.bed }}
         {% endif %}
@@ -28,7 +28,7 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
         {% endfor %}
 
         ; Wait for bed
-        {% if printer_profile.heatedBed %}
+        {% if printer_profile.heatedBed and plugins.smartpreheat.bed != None %}
         M190 S{{ plugins.smartpreheat.bed }}
         {% endif %}
 
@@ -48,6 +48,9 @@ class SmartPreheat(octoprint.plugin.TemplatePlugin,
         scripts = self._settings.listScripts("gcode")
         if not "snippets/doSmartPreheat" in scripts:
             script = self.default_smartpreheat_script
+            self._settings.saveScript("gcode", "snippets/doSmartPreheat", u'' + script.replace("\r\n", "\n").replace("\r", "\n"))
+        elif "{% if printer_profile.heatedBed %}" in scripts["snippets/doSmartPreheat"]:
+            script = scripts["snippets/doSmartPreheat"].replace("{% if printer_profile.heatedBed %}", "{% if printer_profile.heatedBed and plugins.smartpreheat.bed != None %}")
             self._settings.saveScript("gcode", "snippets/doSmartPreheat", u'' + script.replace("\r\n", "\n").replace("\r", "\n"))
 
     def get_settings_defaults(self):
